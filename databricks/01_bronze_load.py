@@ -1,7 +1,7 @@
 # Databricks notebook/source file
 # Bronze layer load for Tokyo 2021 Olympics dataset
 
-from pyspark.sql.functions import current_timestamp, input_file_name
+from pyspark.sql.functions import current_timestamp, col
 
 storage_account = "sttokyo2021waigi"
 
@@ -25,7 +25,7 @@ for table_name, file_name in files.items():
         .option("header", True)
         .option("inferSchema", True)
         .csv(source_path)
-        .withColumn("source_file", input_file_name())
+        .withColumn("source_file", col("_metadata.file_path"))
         .withColumn("ingestion_timestamp", current_timestamp())
     )
 
