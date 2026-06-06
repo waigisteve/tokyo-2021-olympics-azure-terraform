@@ -1,0 +1,5 @@
+location                  = "eastus"
+resource_group_name       = "rg-tokyo2021-olympics-dataeng"
+storage_account_name      = "sttokyo2021olympics01"
+data_factory_name         = "adf-tokyo2021-olympics"
+databricks_workspace_name = "dbw-tokyo2021-olympics"
