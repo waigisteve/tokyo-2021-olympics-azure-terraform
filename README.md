@@ -300,6 +300,58 @@ Destroy resources when they are no longer needed:
 terraform destroy
 ```
 
+### Terraform Destroy Pitfall: Databricks External Location
+
+During cleanup, Terraform may destroy Azure Data Factory, storage containers, and Databricks grants successfully, then fail when deleting the Unity Catalog external location:
+
+```text
+cannot delete external location: Cannot delete external location
+because the location has ... dependent external tables.
+```
+
+This happens when Databricks external tables still reference the Gold layer external location, for example:
+
+```text
+abfss://gold@sttokyo2021waigi.dfs.core.windows.net/
+```
+
+In this state, the `databricks_external_location.gold_layer` resource is still present because Unity Catalog protects the external location while external tables depend on it. The external location itself is metadata and should not create direct compute cost, but any remaining Azure Storage account, containers, files, or other Azure resources can still incur storage or service charges.
+
+Recommended cleanup process:
+
+1. Run a destroy plan first and review the affected resources.
+
+   ```bash
+   terraform plan -destroy
+   ```
+
+2. If destroy fails on `databricks_external_location.gold_layer`, open Databricks SQL and find the external tables that use the Gold storage path.
+3. Drop the dependent external tables.
+
+   ```sql
+   DROP TABLE IF EXISTS catalog_name.schema_name.table_name;
+   ```
+
+4. Rerun Terraform destroy.
+
+   ```bash
+   terraform destroy
+   ```
+
+For disposable lab environments, an alternative is to add `force_destroy = true` to the external location resource:
+
+```hcl
+resource "databricks_external_location" "gold_layer" {
+  name            = "gold_layer_storage"
+  url             = "abfss://${azurerm_storage_container.gold.name}@${azurerm_storage_account.datalake.name}.dfs.core.windows.net/"
+  credential_name = databricks_storage_credential.uc_creds.name
+  comment         = "External location for Unity Catalog managed Gold analytics tables"
+  force_destroy   = true
+}
+```
+
+Use `force_destroy` only when you are comfortable with Unity Catalog no longer managing cleanup for data under that external location. The safer default is to drop the dependent external tables first, then rerun `terraform destroy`.
+
 ## Data Upload
 
 The upload script sends local raw CSV files to the ADLS Gen2 Raw container:
